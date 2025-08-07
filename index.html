@@ -1,150 +1,270 @@
-<script>
-  const API_URL = "https://wordguesser-jr27.onrender.com";
-  const guessesContainer = document.getElementById('guessesContainer');
-  const resultDiv = document.getElementById('result');
-  const wordInput = document.getElementById('wordInput');
-  const modeSelect = document.getElementById('modeSelect');
-  let allGuesses = [];
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Wordle Assistant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 2rem;
+      background-color: #121213;
+      color: white;
+    }
 
-  function createGuessRow(word, editable = true) {
-    const row = document.createElement('div');
-    row.className = 'guess-row';
+    h1 {
+      color: #6aaa64;
+    }
 
-    const guess = [];
+    .controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
 
-    for (let i = 0; i < 5; i++) {
-      const letter = word[i] || '';
-      const div = document.createElement('div');
-      div.className = 'letter gray';
-      div.textContent = letter;
-      div.dataset.index = i;
-      div.dataset.state = 'gray';
+    input[type="text"], select {
+      padding: 10px;
+      font-size: 1.2rem;
+      width: 300px;
+      text-transform: uppercase;
+      text-align: center;
+      border: none;
+      border-radius: 5px;
+    }
 
-      if (editable) {
-        div.addEventListener('click', () => {
-          const next = {
-            gray: 'yellow',
-            yellow: 'green',
-            green: 'gray'
-          };
-          div.classList.remove(div.dataset.state);
-          div.dataset.state = next[div.dataset.state];
-          div.classList.add(div.dataset.state);
-          guess[i].state = div.dataset.state;
+    button {
+      padding: 10px 20px;
+      font-size: 1rem;
+      background-color: #538d4e;
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+
+    .guess-row {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .letter {
+      width: 60px;
+      height: 60px;
+      margin: 4px;
+      font-size: 2rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      border: 2px solid #3a3a3c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #121213;
+      color: white;
+      cursor: pointer;
+    }
+
+    .gray { background-color: #3a3a3c; }
+    .yellow { background-color: #c9b458; }
+    .green { background-color: #6aaa64; }
+
+    .result {
+      margin-top: 2rem;
+      text-align: left;
+      max-width: 500px;
+      margin: 2rem auto;
+    }
+
+    @media (max-width: 600px) {
+      .letter {
+        width: 40px;
+        height: 40px;
+        font-size: 1.5rem;
+      }
+
+      input[type="text"], select, button {
+        width: 90%;
+        font-size: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Wordle Assistant</h1>
+
+  <div class="controls">
+    <input type="text" id="wordInput" maxlength="5" placeholder="Enter your guess" />
+    <select id="languageSelect">
+      <option value="english">English</option>
+      <option value="catalan">Catalan</option>
+    </select>
+    <select id="modeSelect">
+      <option value="support">Wordle Support</option>
+      <option value="vsMachine">Vs the Machine</option>
+    </select>
+    <button id="addGuessBtn">Add Guess</button>
+    <button id="submitBtn">Submit Guesses</button>
+  </div>
+
+  <div id="guessesContainer"></div>
+  <div class="result" id="result"></div>
+
+  <script>
+    const API_URL = "https://wordguesser-jr27.onrender.com";
+    const guessesContainer = document.getElementById('guessesContainer');
+    const resultDiv = document.getElementById('result');
+    const wordInput = document.getElementById('wordInput');
+    const modeSelect = document.getElementById('modeSelect');
+    const addGuessBtn = document.getElementById('addGuessBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    let allGuesses = [];
+
+    function createGuessRow(word, editable = true) {
+      const row = document.createElement('div');
+      row.className = 'guess-row';
+
+      const guess = [];
+
+      for (let i = 0; i < 5; i++) {
+        const letter = word[i] || '';
+        const div = document.createElement('div');
+        div.className = 'letter gray';
+        div.textContent = letter;
+        div.dataset.index = i;
+        div.dataset.state = 'gray';
+
+        if (editable) {
+          div.addEventListener('click', () => {
+            const next = {
+              gray: 'yellow',
+              yellow: 'green',
+              green: 'gray'
+            };
+            div.classList.remove(div.dataset.state);
+            div.dataset.state = next[div.dataset.state];
+            div.classList.add(div.dataset.state);
+            guess[i].state = div.dataset.state;
+          });
+        }
+
+        guess.push({ letter, state: 'gray', div });
+        row.appendChild(div);
+      }
+
+      guessesContainer.appendChild(row);
+      allGuesses.push(guess);
+    }
+
+    function addGuess() {
+      const word = wordInput.value.toUpperCase();
+      if (word.length !== 5) {
+        alert("Please enter a 5-letter word.");
+        return;
+      }
+      wordInput.value = '';
+      createGuessRow(word);
+    }
+
+    async function submitGuesses() {
+      const includedCounts = {};
+      const excluded = new Set();
+      const correct_positions = {};
+      const wrong_positions = {};
+      const language = document.getElementById('languageSelect').value;
+      const mode = modeSelect.value;
+
+      allGuesses.forEach((guess) => {
+        guess.forEach((entry, i) => {
+          const { letter, state } = entry;
+          if (state === 'gray') {
+            const isUsedElsewhere = allGuesses.some(g =>
+              g.some((e) => e.letter === letter && (e.state === 'green' || e.state === 'yellow'))
+            );
+            if (!isUsedElsewhere) excluded.add(letter);
+          }
+          if (state === 'yellow') {
+            includedCounts[letter] = (includedCounts[letter] || 0) + 1;
+            wrong_positions[i] = wrong_positions[i] || [];
+            wrong_positions[i].push(letter);
+          }
+          if (state === 'green') {
+            includedCounts[letter] = (includedCounts[letter] || 0) + 1;
+            correct_positions[i] = letter;
+          }
         });
-      }
-
-      guess.push({ letter, state: 'gray', div });
-      row.appendChild(div);
-    }
-
-    guessesContainer.appendChild(row);
-    allGuesses.push(guess);
-  }
-
-  function addGuess() {
-    const word = wordInput.value.toUpperCase();
-    if (word.length !== 5) {
-      alert("Please enter a 5-letter word.");
-      return;
-    }
-    wordInput.value = '';
-    createGuessRow(word);
-  }
-
-  async function submitGuesses() {
-    const includedCounts = {};
-    const excluded = new Set();
-    const correct_positions = {};
-    const wrong_positions = {};
-    const language = document.getElementById('languageSelect').value;
-    const mode = modeSelect.value;
-
-    allGuesses.forEach((guess) => {
-      guess.forEach((entry, i) => {
-        const { letter, state } = entry;
-        if (state === 'gray') {
-          const isUsedElsewhere = allGuesses.some(g =>
-            g.some((e, idx) => e.letter === letter && (e.state === 'green' || e.state === 'yellow'))
-          );
-          if (!isUsedElsewhere) excluded.add(letter);
-        }
-        if (state === 'yellow') {
-          includedCounts[letter] = (includedCounts[letter] || 0) + 1;
-          wrong_positions[i] = wrong_positions[i] || [];
-          wrong_positions[i].push(letter);
-        }
-        if (state === 'green') {
-          includedCounts[letter] = (includedCounts[letter] || 0) + 1;
-          correct_positions[i] = letter;
-        }
       });
-    });
 
-    const included = Object.entries(includedCounts)
-      .map(([letter, count]) => letter.repeat(count))
-      .join('');
+      const included = Object.entries(includedCounts)
+        .map(([letter, count]) => letter.repeat(count))
+        .join('');
 
-    const payload = {
-      included,
-      excluded: Array.from(excluded).join(''),
-      correct_positions,
-      wrong_positions,
-      language
-    };
+      const payload = {
+        included,
+        excluded: Array.from(excluded).join(''),
+        correct_positions,
+        wrong_positions,
+        language
+      };
 
-    const res = await fetch(`${API_URL}/filter`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+      const res = await fetch(`${API_URL}/filter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.count === 0) {
-      resultDiv.innerHTML = `<p>No matching words found.</p>`;
-      return;
-    }
+      if (data.count === 0) {
+        resultDiv.innerHTML = `<p>No matching words found.</p>`;
+        return;
+      }
 
-    const topWord = data.top_words.length > 0 ? data.top_words[0] : '—';
-    resultDiv.innerHTML = `
-      <h2>🧠 Recommended Next Word: <span style="color:#6aaa64">${topWord}</span></h2>
-      <p>Found <b>${data.count}</b> possible words.</p>
-      <details>
-        <summary>Show all matches</summary>
-        <ul>${data.all_scored.map(([w, s]) => `<li>${w} (${s})</li>`).join('')}</ul>
-      </details>
-    `;
+      const topWord = data.top_words.length > 0 ? data.top_words[0] : '—';
+      resultDiv.innerHTML = `
+        <h2>🧠 Recommended Next Word: <span style="color:#6aaa64">${topWord}</span></h2>
+        <p>Found <b>${data.count}</b> possible words.</p>
+        <details>
+          <summary>Show all matches</summary>
+          <ul>${data.all_scored.map(([w, s]) => `<li>${w} (${s})</li>`).join('')}</ul>
+        </details>
+      `;
 
-    createGuessRow(topWord); // Auto-add next guess row
+      createGuessRow(topWord); // Auto-add next guess row
 
-    if (mode === 'vsMachine' && allGuesses.length === 6) {
-      const lastGuess = allGuesses[5];
-      const allGreen = lastGuess.every(entry => entry.state === 'green');
-      if (!allGreen) {
-        const message = language === 'catalan' ? 'Felicitats Ferran' : 'Congrats you won';
-        alert(message);
+      if (mode === 'vsMachine' && allGuesses.length === 6) {
+        const lastGuess = allGuesses[5];
+        const allGreen = lastGuess.every(entry => entry.state === 'green');
+        if (!allGreen) {
+          const message = language === 'catalan' ? 'Felicitats Ferran' : 'Congrats you won';
+          alert(message);
+        }
       }
     }
-  }
 
-  document.getElementById('submitBtn').addEventListener('click', submitGuesses);
+    submitBtn.addEventListener('click', submitGuesses);
+    addGuessBtn.addEventListener('click', addGuess);
 
-  modeSelect.addEventListener('change', () => {
-    const mode = modeSelect.value;
-    if (mode === 'vsMachine') {
-      wordInput.style.display = 'none';
-      document.querySelector('button[onclick="addGuess()"]').style.display = 'none';
-      allGuesses = [];
-      guessesContainer.innerHTML = '';
-      resultDiv.innerHTML = '';
-      submitGuesses(); // auto-start
-    } else {
-      wordInput.style.display = '';
-      document.querySelector('button[onclick="addGuess()"]').style.display = '';
-      allGuesses = [];
-      guessesContainer.innerHTML = '';
-      resultDiv.innerHTML = '';
-    }
-  });
-</script>
+    modeSelect.addEventListener('change', () => {
+      const mode = modeSelect.value;
+      if (mode === 'vsMachine') {
+        wordInput.style.display = 'none';
+        addGuessBtn.style.display = 'none';
+        allGuesses = [];
+        guessesContainer.innerHTML = '';
+        resultDiv.innerHTML = '';
+        submitGuesses(); // auto-start
+      } else {
+        wordInput.style.display = '';
+        addGuessBtn.style.display = '';
+        allGuesses = [];
+        guessesContainer.innerHTML = '';
+        resultDiv.innerHTML = '';
+      }
+    });
+  </script>
+</body>
+</html>
