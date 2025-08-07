@@ -102,6 +102,10 @@
       <option value="english">English</option>
       <option value="catalan">Catalan</option>
     </select>
+    <select id="modeSelect">
+      <option value="support">Wordle Support</option>
+      <option value="vsMachine">Vs the Machine</option>
+    </select>
     <button onclick="addGuess()">Add Guess</button>
     <button id="submitBtn">Submit Guesses</button>
   </div>
@@ -167,6 +171,7 @@
       const correct_positions = {};
       const wrong_positions = {};
       const language = document.getElementById('languageSelect').value;
+      const mode = document.getElementById('modeSelect').value;
 
       allGuesses.forEach((guess) => {
         guess.forEach((entry, i) => {
@@ -197,7 +202,7 @@
         language
       };
 
-      const res = await fetch('https://wordguesser-jr27.onrender.com/filter', {
+      const res = await fetch(`${API_URL}/filter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -207,21 +212,31 @@
 
       if (data.count === 0) {
         resultDiv.innerHTML = `<p>No matching words found.</p>`;
-      } else {
-        const topWord = data.top_words.length > 0 ? data.top_words[0] : '—';
-        resultDiv.innerHTML = `
-          <h2>🧠 Recommended Next Word: <span style="color:#6aaa64">${topWord}</span></h2>
-          <p>Found <b>${data.count}</b> possible words.</p>
-          <details>
-            <summary>Show all matches</summary>
-            <ul>${data.all_scored.map(([w, s]) => `<li>${w} (${s})</li>`).join('')}</ul>
-          </details>
-        `;
-        createGuessRow(topWord); // Auto-add next guess row
+        return;
+      }
+
+      const topWord = data.top_words.length > 0 ? data.top_words[0] : '—';
+      resultDiv.innerHTML = `
+        <h2>🧠 Recommended Next Word: <span style="color:#6aaa64">${topWord}</span></h2>
+        <p>Found <b>${data.count}</b> possible words.</p>
+        <details>
+          <summary>Show all matches</summary>
+          <ul>${data.all_scored.map(([w, s]) => `<li>${w} (${s})</li>`).join('')}</ul>
+        </details>
+      `;
+
+      createGuessRow(topWord); // Auto-add next guess row
+
+      // 🎯 Check for "Vs the Machine" mode
+      if (mode === 'vsMachine' && allGuesses.length === 6) {
+        const lastGuess = allGuesses[5];
+        const allGreen = lastGuess.every(entry => entry.state === 'green');
+        if (!allGreen) {
+          const message = language === 'catalan' ? 'Felicitats Ferran' : 'Congrats you won';
+          alert(message);
+        }
       }
     });
   </script>
 </body>
 </html>
-
-
