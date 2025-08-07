@@ -25,7 +25,7 @@ def word_score(word, freq_counter):
 # Serve the frontend
 @app.route('/')
 def serve_index():
-    return send_from_directory('.', 'index.html')
+    return send_from_directory('.', 'onlineindex.html')
 
 # Filtering route
 @app.route('/filter', methods=['POST'])
@@ -70,3 +70,4 @@ def filter_words():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
