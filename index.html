@@ -11,7 +11,6 @@
       padding: 2rem;
       background-color: #121213;
       color: white;
-      margin: 0;
     }
 
     h1 {
@@ -80,35 +79,6 @@
       margin: 2rem auto;
     }
 
-    .screen {
-      display: none;
-    }
-
-    .active {
-      display: block;
-    }
-
-    #modeSelectionScreen h1 {
-      font-size: 3em;
-      color: #00ff00;
-      margin-bottom: 20px;
-    }
-
-    #modeSelectionScreen h2 {
-      font-size: 1.5em;
-      margin-bottom: 30px;
-    }
-
-    #modeSelectionScreen button {
-      background-color: black;
-      color: white;
-      border: 2px solid white;
-      padding: 15px 30px;
-      font-size: 1em;
-      margin: 10px;
-      border-radius: 8px;
-    }
-
     @media (max-width: 600px) {
       .letter {
         width: 40px;
@@ -124,37 +94,25 @@
   </style>
 </head>
 <body>
+  <h1>Wordle Assistant</h1>
 
-  <!-- Mode Selection Screen -->
-  <div id="modeSelectionScreen" class="screen active">
-    <h1>WORD GUESSER</h1>
-    <h2>Choose a mode:</h2>
-    <button onclick="startMode('support')">WORDLE SUPPORT</button>
-    <button onclick="startMode('vsMachine')">VS THE MACHINE</button>
+  <div class="controls">
+    <input type="text" id="wordInput" maxlength="5" placeholder="Enter your guess" />
+    <select id="languageSelect">
+      <option value="english">English</option>
+      <option value="catalan">Catalan</option>
+    </select>
+    <select id="modeSelect">
+      <option value="support">Wordle Support</option>
+      <option value="vsMachine">Vs the Machine</option>
+    </select>
+    <button id="addGuessBtn">Add Guess</button>
+    <button id="submitBtn">Submit Guesses</button>
+    <button id="restartBtn">Restart Game</button>
   </div>
 
-  <!-- Main Game Interface -->
-  <div id="gameScreen" class="screen">
-    <h1>Wordle Assistant</h1>
-
-    <div class="controls">
-      <input type="text" id="wordInput" maxlength="5" placeholder="Enter your guess" />
-      <select id="languageSelect">
-        <option value="english">English</option>
-        <option value="catalan">Catalan</option>
-      </select>
-      <select id="modeSelect">
-        <option value="support">Wordle Support</option>
-        <option value="vsMachine">Vs the Machine</option>
-      </select>
-      <button id="addGuessBtn">Add Guess</button>
-      <button id="submitBtn">Submit Guesses</button>
-      <button id="restartBtn">Restart Game</button>
-    </div>
-
-    <div id="guessesContainer"></div>
-    <div class="result" id="result"></div>
-  </div>
+  <div id="guessesContainer"></div>
+  <div class="result" id="result"></div>
 
   <script>
     const API_URL = "https://wordguesser-jr27.onrender.com";
@@ -165,20 +123,7 @@
     const addGuessBtn = document.getElementById('addGuessBtn');
     const submitBtn = document.getElementById('submitBtn');
     const restartBtn = document.getElementById('restartBtn');
-    const modeSelectionScreen = document.getElementById('modeSelectionScreen');
-    const gameScreen = document.getElementById('gameScreen');
     let allGuesses = [];
-
-    function startMode(mode) {
-      modeSelectionScreen.classList.remove('active');
-      gameScreen.classList.add('active');
-      modeSelect.value = mode;
-      if (mode === 'vsMachine') {
-        wordInput.style.display = 'none';
-        addGuessBtn.style.display = 'none';
-        submitGuesses(); // auto-start
-      }
-    }
 
     function createGuessRow(word, editable = true) {
       const row = document.createElement('div');
@@ -239,4 +184,86 @@
           const { letter, state } = entry;
           if (state === 'gray') {
             const isUsedElsewhere = allGuesses.some(g =>
-              g.some((e) => e
+              g.some((e) => e.letter === letter && (e.state === 'green' || e.state === 'yellow'))
+            );
+            if (!isUsedElsewhere) excluded.add(letter);
+          }
+          if (state === 'yellow') {
+            included.push(letter);
+            wrong_positions[i] = wrong_positions[i] || [];
+            wrong_positions[i].push(letter);
+          }
+          if (state === 'green') {
+            included.push(letter);
+            correct_positions[i] = letter;
+          }
+        });
+      });
+
+      const payload = {
+        included: included.join(''),
+        excluded: Array.from(excluded).join(''),
+        correct_positions,
+        wrong_positions,
+        language
+      };
+
+      const res = await fetch(`${API_URL}/filter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (data.count === 0) {
+        resultDiv.innerHTML = `<p>No matching words found, but there may be a bug. Try restarting.</p>`;
+        return;
+      }
+
+      const topWord = data.top_words.length > 0 ? data.top_words[0] : '—';
+      resultDiv.innerHTML = `
+        <h2>🧠 Recommended Next Word: <span style="color:#6aaa64">${topWord}</span></h2>
+        <p>Found <b>${data.count}</b> possible words.</p>
+        <details>
+          <summary>Show all matches</summary>
+          <ul>${data.all_scored.map(([w, s]) => `<li>${w} (${s})</li>`).join('')}</ul>
+        </details>
+      `;
+
+      createGuessRow(topWord); // Auto-add next guess row
+
+      if (mode === 'vsMachine' && allGuesses.length === 6) {
+        const lastGuess = allGuesses[5];
+        const allGreen = lastGuess.every(entry => entry.state === 'green');
+        if (!allGreen) {
+          const message = language === 'catalan' ? 'Felicitats Ferran' : 'Congrats you won';
+          alert(message);
+        }
+      }
+    }
+
+    function restartGame() {
+      allGuesses = [];
+      guessesContainer.innerHTML = '';
+      resultDiv.innerHTML = '';
+      wordInput.style.display = '';
+      addGuessBtn.style.display = '';
+    }
+
+    submitBtn.addEventListener('click', submitGuesses);
+    addGuessBtn.addEventListener('click', addGuess);
+    restartBtn.addEventListener('click', restartGame);
+
+    modeSelect.addEventListener('change', () => {
+      const mode = modeSelect.value;
+      restartGame();
+      if (mode === 'vsMachine') {
+        wordInput.style.display = 'none';
+        addGuessBtn.style.display = 'none';
+        submitGuesses(); // auto-start
+      }
+    });
+  </script>
+</body>
+</html>
