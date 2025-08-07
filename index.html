@@ -102,13 +102,8 @@
       <option value="english">English</option>
       <option value="catalan">Catalan</option>
     </select>
-    <select id="modeSelect">
-      <option value="support">Wordle Support</option>
-      <option value="vsMachine">Vs the Machine</option>
-    </select>
-    <button id="addGuessBtn">Add Guess</button>
+    <button onclick="addGuess()">Add Guess</button>
     <button id="submitBtn">Submit Guesses</button>
-    <button id="restartBtn">Restart Game</button>
   </div>
 
   <div id="guessesContainer"></div>
@@ -118,11 +113,6 @@
     const API_URL = "https://wordguesser-jr27.onrender.com";
     const guessesContainer = document.getElementById('guessesContainer');
     const resultDiv = document.getElementById('result');
-    const wordInput = document.getElementById('wordInput');
-    const modeSelect = document.getElementById('modeSelect');
-    const addGuessBtn = document.getElementById('addGuessBtn');
-    const submitBtn = document.getElementById('submitBtn');
-    const restartBtn = document.getElementById('restartBtn');
     let allGuesses = [];
 
     function createGuessRow(word, editable = true) {
@@ -162,53 +152,52 @@
     }
 
     function addGuess() {
-      const word = wordInput.value.toUpperCase();
+      const word = document.getElementById('wordInput').value.toUpperCase();
       if (word.length !== 5) {
         alert("Please enter a 5-letter word.");
         return;
       }
-      wordInput.value = '';
+      document.getElementById('wordInput').value = '';
       createGuessRow(word);
     }
 
-    async function submitGuesses() {
-      const included = [];
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+      const included = new Set();
       const excluded = new Set();
       const correct_positions = {};
       const wrong_positions = {};
       const language = document.getElementById('languageSelect').value;
-      const mode = modeSelect.value;
 
       allGuesses.forEach((guess) => {
         guess.forEach((entry, i) => {
           const { letter, state } = entry;
           if (state === 'gray') {
             const isUsedElsewhere = allGuesses.some(g =>
-              g.some((e) => e.letter === letter && (e.state === 'green' || e.state === 'yellow'))
+              g.some((e, idx) => e.letter === letter && (e.state === 'green' || e.state === 'yellow'))
             );
             if (!isUsedElsewhere) excluded.add(letter);
           }
           if (state === 'yellow') {
-            included.push(letter);
+            included.add(letter);
             wrong_positions[i] = wrong_positions[i] || [];
             wrong_positions[i].push(letter);
           }
           if (state === 'green') {
-            included.push(letter);
+            included.add(letter);
             correct_positions[i] = letter;
           }
         });
       });
 
       const payload = {
-        included: included.join(''),
+        included: Array.from(included).join(''),
         excluded: Array.from(excluded).join(''),
         correct_positions,
         wrong_positions,
         language
       };
 
-      const res = await fetch(`${API_URL}/filter`, {
+      const res = await fetch('hhttps://wordguesser-jr27.onrender.com/filter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -217,51 +206,18 @@
       const data = await res.json();
 
       if (data.count === 0) {
-        resultDiv.innerHTML = `<p>No matching words found, but there may be a bug. Try restarting.</p>`;
-        return;
-      }
-
-      const topWord = data.top_words.length > 0 ? data.top_words[0] : '—';
-      resultDiv.innerHTML = `
-        <h2>🧠 Recommended Next Word: <span style="color:#6aaa64">${topWord}</span></h2>
-        <p>Found <b>${data.count}</b> possible words.</p>
-        <details>
-          <summary>Show all matches</summary>
-          <ul>${data.all_scored.map(([w, s]) => `<li>${w} (${s})</li>`).join('')}</ul>
-        </details>
-      `;
-
-      createGuessRow(topWord); // Auto-add next guess row
-
-      if (mode === 'vsMachine' && allGuesses.length === 6) {
-        const lastGuess = allGuesses[5];
-        const allGreen = lastGuess.every(entry => entry.state === 'green');
-        if (!allGreen) {
-          const message = language === 'catalan' ? 'Felicitats Ferran' : 'Congrats you won';
-          alert(message);
-        }
-      }
-    }
-
-    function restartGame() {
-      allGuesses = [];
-      guessesContainer.innerHTML = '';
-      resultDiv.innerHTML = '';
-      wordInput.style.display = '';
-      addGuessBtn.style.display = '';
-    }
-
-    submitBtn.addEventListener('click', submitGuesses);
-    addGuessBtn.addEventListener('click', addGuess);
-    restartBtn.addEventListener('click', restartGame);
-
-    modeSelect.addEventListener('change', () => {
-      const mode = modeSelect.value;
-      restartGame();
-      if (mode === 'vsMachine') {
-        wordInput.style.display = 'none';
-        addGuessBtn.style.display = 'none';
-        submitGuesses(); // auto-start
+        resultDiv.innerHTML = `<p>No matching words found.</p>`;
+      } else {
+        const topWord = data.top_words.length > 0 ? data.top_words[0] : '—';
+        resultDiv.innerHTML = `
+          <h2>🧠 Recommended Next Word: <span style="color:#6aaa64">${topWord}</span></h2>
+          <p>Found <b>${data.count}</b> possible words.</p>
+          <details>
+            <summary>Show all matches</summary>
+            <ul>${data.all_scored.map(([w, s]) => `<li>${w} (${s})</li>`).join('')}</ul>
+          </details>
+        `;
+        createGuessRow(topWord); // Auto-add next guess row
       }
     });
   </script>
