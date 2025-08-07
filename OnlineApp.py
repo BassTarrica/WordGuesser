@@ -58,7 +58,16 @@ def filter_words():
             continue
 
         # Check wrong positions (yellow)
-        if any(word_upper[pos] in wrong for pos, wrong in wrong_positions.items()):
+        invalid = False
+        for pos, wrong_letters in wrong_positions.items():
+            for letter in wrong_letters:
+                if word_upper[pos] == letter:
+                    invalid = True  # letter is in the wrong position
+                elif letter not in word_upper:
+                    invalid = True  # letter must appear somewhere else
+            if invalid:
+                break
+        if invalid:
             continue
 
         # Check excluded letters — only if not in included
@@ -86,6 +95,7 @@ def filter_words():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
