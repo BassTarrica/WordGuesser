@@ -108,6 +108,7 @@
     </select>
     <button id="addGuessBtn">Add Guess</button>
     <button id="submitBtn">Submit Guesses</button>
+    <button id="restartBtn">Restart Game</button>
   </div>
 
   <div id="guessesContainer"></div>
@@ -121,6 +122,7 @@
     const modeSelect = document.getElementById('modeSelect');
     const addGuessBtn = document.getElementById('addGuessBtn');
     const submitBtn = document.getElementById('submitBtn');
+    const restartBtn = document.getElementById('restartBtn');
     let allGuesses = [];
 
     function createGuessRow(word, editable = true) {
@@ -170,7 +172,7 @@
     }
 
     async function submitGuesses() {
-      const includedCounts = {};
+      const included = [];
       const excluded = new Set();
       const correct_positions = {};
       const wrong_positions = {};
@@ -187,23 +189,19 @@
             if (!isUsedElsewhere) excluded.add(letter);
           }
           if (state === 'yellow') {
-            includedCounts[letter] = (includedCounts[letter] || 0) + 1;
+            included.push(letter);
             wrong_positions[i] = wrong_positions[i] || [];
             wrong_positions[i].push(letter);
           }
           if (state === 'green') {
-            includedCounts[letter] = (includedCounts[letter] || 0) + 1;
+            included.push(letter);
             correct_positions[i] = letter;
           }
         });
       });
 
-      const included = Object.entries(includedCounts)
-        .map(([letter, count]) => letter.repeat(count))
-        .join('');
-
       const payload = {
-        included,
+        included: included.join(''),
         excluded: Array.from(excluded).join(''),
         correct_positions,
         wrong_positions,
@@ -219,7 +217,7 @@
       const data = await res.json();
 
       if (data.count === 0) {
-        resultDiv.innerHTML = `<p>No matching words found.</p>`;
+        resultDiv.innerHTML = `<p>No matching words found, but there may be a bug. Try restarting.</p>`;
         return;
       }
 
@@ -245,26 +243,28 @@
       }
     }
 
+    function restartGame() {
+      allGuesses = [];
+      guessesContainer.innerHTML = '';
+      resultDiv.innerHTML = '';
+      wordInput.style.display = '';
+      addGuessBtn.style.display = '';
+    }
+
     submitBtn.addEventListener('click', submitGuesses);
     addGuessBtn.addEventListener('click', addGuess);
+    restartBtn.addEventListener('click', restartGame);
 
     modeSelect.addEventListener('change', () => {
       const mode = modeSelect.value;
+      restartGame();
       if (mode === 'vsMachine') {
         wordInput.style.display = 'none';
         addGuessBtn.style.display = 'none';
-        allGuesses = [];
-        guessesContainer.innerHTML = '';
-        resultDiv.innerHTML = '';
         submitGuesses(); // auto-start
-      } else {
-        wordInput.style.display = '';
-        addGuessBtn.style.display = '';
-        allGuesses = [];
-        guessesContainer.innerHTML = '';
-        resultDiv.innerHTML = '';
       }
     });
   </script>
 </body>
 </html>
+``
