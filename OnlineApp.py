@@ -48,15 +48,33 @@ def filter_words():
 
     filtered = []
     for word in words:
-        if any(ch in excluded for ch in word):
+        word_upper = word.upper()
+
+        # Exclude words with any excluded letters
+        if any(ch in excluded for ch in word_upper):
             continue
-        if not included.issubset(set(word)):
+
+        # Check correct positions (green)
+        if any(word_upper[pos] != val for pos, val in correct_positions.items()):
             continue
-        if any(word[pos] != val for pos, val in correct_positions.items()):
+
+        # Check wrong positions (yellow)
+        if any(word_upper[pos] in wrong for pos, wrong in wrong_positions.items()):
             continue
-        if any(word[pos] in wrong for pos, wrong in wrong_positions.items()):
+
+        # Check included letters (green + yellow), allowing for duplicates
+        required_counts = Counter()
+        for letter in included:
+            # Count how many times this letter appears in correct and wrong positions
+            correct_count = sum(1 for pos, val in correct_positions.items() if val == letter)
+            wrong_count = sum(1 for pos, wrongs in wrong_positions.items() if letter in wrongs)
+            required_counts[letter] = correct_count + wrong_count
+
+        word_letter_counts = Counter(word_upper)
+        if any(word_letter_counts[letter] < required_counts[letter] for letter in included):
             continue
-        filtered.append(word)
+
+        filtered.append(word_upper)
 
     scored = sorted(
         [(w, word_score(w, freq_counter)) for w in filtered],
@@ -73,6 +91,7 @@ def filter_words():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
