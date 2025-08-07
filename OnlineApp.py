@@ -4,7 +4,7 @@ from collections import Counter
 import os
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["https://basstarrica.github.io"])
 
 # Load word lists
 WORD_LISTS = {}
@@ -73,6 +73,7 @@ def filter_words():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
 
 
 
